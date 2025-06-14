@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,11 +11,9 @@ import type { Tables } from "@/integrations/supabase/types";
 
 // Use the Supabase generated types
 type Ticket = Tables<'support_tickets'>;
-type Task = Tables<'tasks'>;
 
 const SupportDashboard = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -23,7 +22,6 @@ const SupportDashboard = () => {
 
   useEffect(() => {
     fetchTickets();
-    fetchTasks();
   }, []);
 
   useEffect(() => {
@@ -58,24 +56,6 @@ const SupportDashboard = () => {
       }
 
       setTickets(data || []);
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-
-  const fetchTasks = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching tasks:', error);
-        return;
-      }
-
-      setTasks(data || []);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -118,7 +98,6 @@ const SupportDashboard = () => {
   const refreshData = () => {
     setLoading(true);
     fetchTickets();
-    fetchTasks();
   };
 
   const getStatusIcon = (status: string) => {
@@ -177,7 +156,6 @@ const SupportDashboard = () => {
     open: tickets.filter(t => t.status === 'open').length,
     pending: tickets.filter(t => t.status === 'pending').length,
     closed: tickets.filter(t => t.status === 'closed').length,
-    tasks: tasks.length,
   };
 
   if (loading) {
@@ -194,7 +172,7 @@ const SupportDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -246,20 +224,6 @@ const SupportDashboard = () => {
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Tasks Created</p>
-                <p className="text-3xl font-bold text-purple-600">{stats.tasks}</p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -390,35 +354,6 @@ const SupportDashboard = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Tasks List */}
-      {tasks.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Tasks Created from Messages ({tasks.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {tasks.slice(0, 5).map((task) => (
-                <div key={task.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{task.name}</h3>
-                      <p className="text-sm text-gray-600">Status: {task.status}</p>
-                      <p className="text-sm text-gray-600">Scheduled: {task.date} at {task.time}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500">
-                        Created {new Date(task.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
