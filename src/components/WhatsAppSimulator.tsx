@@ -54,13 +54,10 @@ const WhatsAppSimulator = () => {
 
       if (ticketError) {
         console.error('Error creating support ticket:', ticketError);
-        return;
+        return null;
       }
 
-      toast({
-        title: "Support ticket created!",
-        description: `Ticket ${ticketData.id.slice(0, 8)} created for manual review.`,
-      });
+      return ticketData;
     } catch (error) {
       console.error('Error creating support ticket:', error);
       toast({
@@ -68,6 +65,7 @@ const WhatsAppSimulator = () => {
         description: "There was an error creating the support ticket. Please try again.",
         variant: "destructive",
       });
+      return null;
     }
   };
 
@@ -90,36 +88,29 @@ const WhatsAppSimulator = () => {
     
     setMessages(prev => [...prev, userMessage]);
 
-    // Auto-respond if suggestion found
-    if (suggestion) {
-      setTimeout(() => {
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: suggestion,
-          sender: 'bot',
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, botMessage]);
-      }, 1000);
-
+    // Always create a support ticket for every user query
+    const ticketData = await createSupportTicket(currentMessage, category);
+    
+    if (ticketData) {
       toast({
-        title: "Auto-suggestion provided!",
-        description: `Classified as: ${category}`,
+        title: "Support ticket created!",
+        description: `Ticket ${ticketData.id.slice(0, 8)} created with category: ${category}`,
       });
-    } else {
-      // No auto-suggestion found, create support ticket for manual review
-      await createSupportTicket(currentMessage, category);
-      
-      setTimeout(() => {
-        const botMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: "Thank you for your message. I've created a support ticket for manual review by our team. You can track the status in our support dashboard.",
-          sender: 'bot',
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, botMessage]);
-      }, 1000);
     }
+
+    // Auto-respond if suggestion found, otherwise provide a generic response
+    setTimeout(() => {
+      const botResponse = suggestion || 
+        "Thank you for your message. I've created a support ticket for your query and our team will review it. You can track the status in our support dashboard.";
+      
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: botResponse,
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, botMessage]);
+    }, 1000);
 
     setCurrentMessage('');
   };
@@ -207,29 +198,29 @@ const WhatsAppSimulator = () => {
         <CardContent className="space-y-4">
           <div className="text-sm text-gray-600">
             <p className="mb-4">
-              Try these sample messages to see the classification in action:
+              Every message creates a support ticket! Try these sample messages to see different categories:
             </p>
             <div className="space-y-2">
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium">API Issue (Auto-response):</p>
+                <p className="font-medium">API Issue (High Priority):</p>
                 <p className="text-sm">"My API calls are returning 500 errors"</p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium">Transaction Delay (Auto-response):</p>
+                <p className="font-medium">Transaction Delay (High Priority):</p>
                 <p className="text-sm">"My payment has been pending for 2 hours"</p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium">Onboarding (Auto-response):</p>
+                <p className="font-medium">Onboarding (Low Priority):</p>
                 <p className="text-sm">"How do I set up my account?"</p>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium">Product Flow (Auto-response):</p>
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="font-medium text-blue-800">Product Flow (Medium Priority):</p>
                 <p className="text-sm">"I can't find the checkout button"</p>
+                <p className="text-xs text-blue-600 mt-1">Product-related queries get "Product Flow" category!</p>
               </div>
-              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                <p className="font-medium text-red-800">General (Creates Ticket):</p>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="font-medium">General (Medium Priority):</p>
                 <p className="text-sm">"I have a custom integration question"</p>
-                <p className="text-xs text-red-600 mt-1">Will create a support ticket for manual review!</p>
               </div>
             </div>
           </div>
