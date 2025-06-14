@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,25 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Clock, AlertCircle, CheckCircle, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import type { Tables } from "@/integrations/supabase/types";
 
-interface Ticket {
-  id: string;
-  message: string;
-  category: string;
-  status: 'open' | 'pending' | 'closed';
-  priority: 'low' | 'medium' | 'high';
-  created_at: string;
-  customer_email: string | null;
-}
-
-interface Task {
-  id: string;
-  name: string;
-  status: string;
-  date: string;
-  time: string;
-  created_at: string;
-}
+// Use the Supabase generated types
+type Ticket = Tables<'support_tickets'>;
+type Task = Tables<'tasks'>;
 
 const SupportDashboard = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -98,7 +83,7 @@ const SupportDashboard = () => {
     }
   };
 
-  const updateTicketStatus = async (ticketId: string, newStatus: 'open' | 'pending' | 'closed') => {
+  const updateTicketStatus = async (ticketId: string, newStatus: string) => {
     try {
       const { error } = await supabase
         .from('support_tickets')
