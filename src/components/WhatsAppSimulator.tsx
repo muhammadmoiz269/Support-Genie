@@ -23,22 +23,31 @@ const WhatsAppSimulator = () => {
   const [currentMessage, setCurrentMessage] = useState('');
   const { toast } = useToast();
 
-  const isTaskMessage = (message: string): boolean => {
-    const taskKeywords = ['task', 'todo', 'need to', 'schedule', 'reminder', 'meeting', 'deadline', 'complete', 'finish'];
-    const lowerMessage = message.toLowerCase();
-    return taskKeywords.some(keyword => lowerMessage.includes(keyword));
-  };
-
-  const createTaskFromMessage = async (message: string) => {
+  const createSupportTicket = async (message: string, category: string) => {
     try {
-      // Create support ticket
+      // Determine priority based on category
+      const getPriority = (cat: string) => {
+        switch (cat) {
+          case 'API Issue':
+            return 'high';
+          case 'Transaction Delay':
+            return 'high';
+          case 'Product Flow':
+            return 'medium';
+          case 'Onboarding':
+            return 'low';
+          default:
+            return 'medium';
+        }
+      };
+
       const { data: ticketData, error: ticketError } = await supabase
         .from('support_tickets')
         .insert({
           message,
-          category: 'Task Request',
+          category,
           status: 'open',
-          priority: 'medium'
+          priority: getPriority(category)
         })
         .select()
         .single();
@@ -48,30 +57,15 @@ const WhatsAppSimulator = () => {
         return;
       }
 
-      // Create task
-      const { error: taskError } = await supabase
-        .from('tasks')
-        .insert({
-          name: message.length > 50 ? message.substring(0, 47) + '...' : message,
-          status: 'pending',
-          date: new Date().toISOString().split('T')[0],
-          time: new Date().toTimeString().split(' ')[0]
-        });
-
-      if (taskError) {
-        console.error('Error creating task:', taskError);
-        return;
-      }
-
       toast({
-        title: "Task created successfully!",
-        description: "A new task has been added to your dashboard.",
+        title: "Support ticket created!",
+        description: `Ticket ${ticketData.id.slice(0, 8)} created for manual review.`,
       });
     } catch (error) {
-      console.error('Error creating task:', error);
+      console.error('Error creating support ticket:', error);
       toast({
-        title: "Error creating task",
-        description: "There was an error creating the task. Please try again.",
+        title: "Error creating ticket",
+        description: "There was an error creating the support ticket. Please try again.",
         variant: "destructive",
       });
     }
@@ -109,30 +103,22 @@ const WhatsAppSimulator = () => {
       }, 1000);
 
       toast({
-        title: "Auto-suggestion found!",
+        title: "Auto-suggestion provided!",
         description: `Classified as: ${category}`,
       });
     } else {
-      // Check if it's a task-related message
-      if (isTaskMessage(currentMessage)) {
-        await createTaskFromMessage(currentMessage);
-        
-        setTimeout(() => {
-          const botMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            text: "I've created a task for you based on your message. You can view it in the Support Dashboard.",
-            sender: 'bot',
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, botMessage]);
-        }, 1000);
-      } else {
-        toast({
-          title: "Query logged for manual review",
-          description: `Category: ${category} - No auto-suggestion available`,
-          variant: "destructive",
-        });
-      }
+      // No auto-suggestion found, create support ticket for manual review
+      await createSupportTicket(currentMessage, category);
+      
+      setTimeout(() => {
+        const botMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: "Thank you for your message. I've created a support ticket for manual review by our team. You can track the status in our support dashboard.",
+          sender: 'bot',
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, botMessage]);
+      }, 1000);
     }
 
     setCurrentMessage('');
@@ -144,7 +130,6 @@ const WhatsAppSimulator = () => {
       'Transaction Delay': 'bg-orange-100 text-orange-800',
       'Product Flow': 'bg-blue-100 text-blue-800',
       'Onboarding': 'bg-green-100 text-green-800',
-      'Task Request': 'bg-purple-100 text-purple-800',
       'General': 'bg-gray-100 text-gray-800',
     };
     return colors[category as keyof typeof colors] || colors.General;
@@ -226,25 +211,25 @@ const WhatsAppSimulator = () => {
             </p>
             <div className="space-y-2">
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium">API Issue:</p>
+                <p className="font-medium">API Issue (Auto-response):</p>
                 <p className="text-sm">"My API calls are returning 500 errors"</p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium">Transaction Delay:</p>
+                <p className="font-medium">Transaction Delay (Auto-response):</p>
                 <p className="text-sm">"My payment has been pending for 2 hours"</p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium">Onboarding:</p>
+                <p className="font-medium">Onboarding (Auto-response):</p>
                 <p className="text-sm">"How do I set up my account?"</p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium">Product Flow:</p>
+                <p className="font-medium">Product Flow (Auto-response):</p>
                 <p className="text-sm">"I can't find the checkout button"</p>
               </div>
-              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                <p className="font-medium text-purple-800">Task Creation:</p>
-                <p className="text-sm">"I need to schedule a meeting tomorrow"</p>
-                <p className="text-xs text-purple-600 mt-1">Will create a task automatically!</p>
+              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                <p className="font-medium text-red-800">General (Creates Ticket):</p>
+                <p className="text-sm">"I have a custom integration question"</p>
+                <p className="text-xs text-red-600 mt-1">Will create a support ticket for manual review!</p>
               </div>
             </div>
           </div>
