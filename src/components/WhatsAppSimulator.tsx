@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Send, Bot, User, MessageSquare } from 'lucide-react';
 import { classifyMessage, getKnowledgeBaseSuggestion } from '@/utils/messageProcessor';
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -22,7 +23,61 @@ const WhatsAppSimulator = () => {
   const [currentMessage, setCurrentMessage] = useState('');
   const { toast } = useToast();
 
-  const handleSendMessage = () => {
+  const isTaskMessage = (message: string): boolean => {
+    const taskKeywords = ['task', 'todo', 'need to', 'schedule', 'reminder', 'meeting', 'deadline', 'complete', 'finish'];
+    const lowerMessage = message.toLowerCase();
+    return taskKeywords.some(keyword => lowerMessage.includes(keyword));
+  };
+
+  const createTaskFromMessage = async (message: string) => {
+    try {
+      // Create support ticket
+      const { data: ticketData, error: ticketError } = await supabase
+        .from('support_tickets')
+        .insert({
+          message,
+          category: 'Task Request',
+          status: 'open',
+          priority: 'medium'
+        })
+        .select()
+        .single();
+
+      if (ticketError) {
+        console.error('Error creating support ticket:', ticketError);
+        return;
+      }
+
+      // Create task
+      const { error: taskError } = await supabase
+        .from('tasks')
+        .insert({
+          name: message.length > 50 ? message.substring(0, 47) + '...' : message,
+          status: 'pending',
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toTimeString().split(' ')[0]
+        });
+
+      if (taskError) {
+        console.error('Error creating task:', taskError);
+        return;
+      }
+
+      toast({
+        title: "Task created successfully!",
+        description: "A new task has been added to your dashboard.",
+      });
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast({
+        title: "Error creating task",
+        description: "There was an error creating the task. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSendMessage = async () => {
     if (!currentMessage.trim()) return;
 
     const userMessage: Message = {
@@ -58,11 +113,26 @@ const WhatsAppSimulator = () => {
         description: `Classified as: ${category}`,
       });
     } else {
-      toast({
-        title: "Query logged for manual review",
-        description: `Category: ${category} - No auto-suggestion available`,
-        variant: "destructive",
-      });
+      // Check if it's a task-related message
+      if (isTaskMessage(currentMessage)) {
+        await createTaskFromMessage(currentMessage);
+        
+        setTimeout(() => {
+          const botMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: "I've created a task for you based on your message. You can view it in the Support Dashboard.",
+            sender: 'bot',
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, botMessage]);
+        }, 1000);
+      } else {
+        toast({
+          title: "Query logged for manual review",
+          description: `Category: ${category} - No auto-suggestion available`,
+          variant: "destructive",
+        });
+      }
     }
 
     setCurrentMessage('');
@@ -74,6 +144,7 @@ const WhatsAppSimulator = () => {
       'Transaction Delay': 'bg-orange-100 text-orange-800',
       'Product Flow': 'bg-blue-100 text-blue-800',
       'Onboarding': 'bg-green-100 text-green-800',
+      'Task Request': 'bg-purple-100 text-purple-800',
       'General': 'bg-gray-100 text-gray-800',
     };
     return colors[category as keyof typeof colors] || colors.General;
@@ -169,6 +240,11 @@ const WhatsAppSimulator = () => {
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="font-medium">Product Flow:</p>
                 <p className="text-sm">"I can't find the checkout button"</p>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="font-medium text-purple-800">Task Creation:</p>
+                <p className="text-sm">"I need to schedule a meeting tomorrow"</p>
+                <p className="text-xs text-purple-600 mt-1">Will create a task automatically!</p>
               </div>
             </div>
           </div>

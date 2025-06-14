@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, AlertCircle, CheckCircle, Filter } from 'lucide-react';
-import { generateSampleTickets } from '@/utils/messageProcessor';
+import { Clock, AlertCircle, CheckCircle, Filter, RefreshCw } from 'lucide-react';
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Ticket {
   id: string;
@@ -13,20 +14,31 @@ interface Ticket {
   category: string;
   status: 'open' | 'pending' | 'closed';
   priority: 'low' | 'medium' | 'high';
-  createdAt: Date;
-  customer: string;
+  created_at: string;
+  customer_email: string | null;
+}
+
+interface Task {
+  id: string;
+  name: string;
+  status: string;
+  date: string;
+  time: string;
+  created_at: string;
 }
 
 const SupportDashboard = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const sampleTickets = generateSampleTickets();
-    setTickets(sampleTickets);
-    setFilteredTickets(sampleTickets);
+    fetchTickets();
+    fetchTasks();
   }, []);
 
   useEffect(() => {
@@ -43,12 +55,85 @@ const SupportDashboard = () => {
     setFilteredTickets(filtered);
   }, [tickets, statusFilter, categoryFilter]);
 
-  const updateTicketStatus = (ticketId: string, newStatus: 'open' | 'pending' | 'closed') => {
-    setTickets(prev => 
-      prev.map(ticket => 
-        ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket
-      )
-    );
+  const fetchTickets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching tickets:', error);
+        toast({
+          title: "Error fetching tickets",
+          description: "Could not load support tickets",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setTickets(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const fetchTasks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching tasks:', error);
+        return;
+      }
+
+      setTasks(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateTicketStatus = async (ticketId: string, newStatus: 'open' | 'pending' | 'closed') => {
+    try {
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', ticketId);
+
+      if (error) {
+        console.error('Error updating ticket:', error);
+        toast({
+          title: "Error updating ticket",
+          description: "Could not update ticket status",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setTickets(prev => 
+        prev.map(ticket => 
+          ticket.id === ticketId ? { ...ticket, status: newStatus } : ticket
+        )
+      );
+
+      toast({
+        title: "Ticket updated",
+        description: `Ticket status changed to ${newStatus}`,
+      });
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const refreshData = () => {
+    setLoading(true);
+    fetchTickets();
+    fetchTasks();
   };
 
   const getStatusIcon = (status: string) => {
@@ -83,6 +168,7 @@ const SupportDashboard = () => {
       'Transaction Delay': 'bg-orange-100 text-orange-800',
       'Product Flow': 'bg-blue-100 text-blue-800',
       'Onboarding': 'bg-green-100 text-green-800',
+      'Task Request': 'bg-purple-100 text-purple-800',
       'General': 'bg-gray-100 text-gray-800',
     };
     return colors[category as keyof typeof colors] || colors.General;
@@ -106,12 +192,24 @@ const SupportDashboard = () => {
     open: tickets.filter(t => t.status === 'open').length,
     pending: tickets.filter(t => t.status === 'pending').length,
     closed: tickets.filter(t => t.status === 'closed').length,
+    tasks: tasks.length,
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -167,15 +265,35 @@ const SupportDashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Tasks Created</p>
+                <p className="text-3xl font-bold text-purple-600">{stats.tasks}</p>
+              </div>
+              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filters
+            </CardTitle>
+            <Button onClick={refreshData} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4">
@@ -201,6 +319,7 @@ const SupportDashboard = () => {
                 <SelectItem value="Transaction Delay">Transaction Delay</SelectItem>
                 <SelectItem value="Product Flow">Product Flow</SelectItem>
                 <SelectItem value="Onboarding">Onboarding</SelectItem>
+                <SelectItem value="Task Request">Task Request</SelectItem>
                 <SelectItem value="General">General</SelectItem>
               </SelectContent>
             </Select>
@@ -215,70 +334,106 @@ const SupportDashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredTickets.map((ticket) => (
-              <div key={ticket.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(ticket.status)}
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{ticket.id}</h3>
-                      <p className="text-sm text-gray-600">{ticket.customer}</p>
+            {filteredTickets.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No support tickets found.</p>
+                <p className="text-sm">Try sending a message in the WhatsApp simulator to create some tickets!</p>
+              </div>
+            ) : (
+              filteredTickets.map((ticket) => (
+                <div key={ticket.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(ticket.status)}
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{ticket.id.slice(0, 8)}</h3>
+                        <p className="text-sm text-gray-600">{ticket.customer_email || 'Anonymous'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getPriorityColor(ticket.priority)}>
+                        {ticket.priority.toUpperCase()}
+                      </Badge>
+                      <Badge className={getCategoryColor(ticket.category)}>
+                        {ticket.category}
+                      </Badge>
+                      <Badge className={getStatusColor(ticket.status)}>
+                        {ticket.status.toUpperCase()}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className={getPriorityColor(ticket.priority)}>
-                      {ticket.priority.toUpperCase()}
-                    </Badge>
-                    <Badge className={getCategoryColor(ticket.category)}>
-                      {ticket.category}
-                    </Badge>
-                    <Badge className={getStatusColor(ticket.status)}>
-                      {ticket.status.toUpperCase()}
-                    </Badge>
+                  
+                  <p className="text-gray-700 mb-3">{ticket.message}</p>
+                  
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-500">
+                      Created {new Date(ticket.created_at).toLocaleString()}
+                    </p>
+                    <div className="flex gap-2">
+                      {ticket.status !== 'pending' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateTicketStatus(ticket.id, 'pending')}
+                        >
+                          Mark Pending
+                        </Button>
+                      )}
+                      {ticket.status !== 'closed' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateTicketStatus(ticket.id, 'closed')}
+                        >
+                          Close Ticket
+                        </Button>
+                      )}
+                      {ticket.status === 'closed' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateTicketStatus(ticket.id, 'open')}
+                        >
+                          Reopen
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-                
-                <p className="text-gray-700 mb-3">{ticket.message}</p>
-                
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-500">
-                    Created {ticket.createdAt.toLocaleString()}
-                  </p>
-                  <div className="flex gap-2">
-                    {ticket.status !== 'pending' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateTicketStatus(ticket.id, 'pending')}
-                      >
-                        Mark Pending
-                      </Button>
-                    )}
-                    {ticket.status !== 'closed' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateTicketStatus(ticket.id, 'closed')}
-                      >
-                        Close Ticket
-                      </Button>
-                    )}
-                    {ticket.status === 'closed' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateTicketStatus(ticket.id, 'open')}
-                      >
-                        Reopen
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Tasks List */}
+      {tasks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Tasks Created from Messages ({tasks.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {tasks.slice(0, 5).map((task) => (
+                <div key={task.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{task.name}</h3>
+                      <p className="text-sm text-gray-600">Status: {task.status}</p>
+                      <p className="text-sm text-gray-600">Scheduled: {task.date} at {task.time}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">
+                        Created {new Date(task.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

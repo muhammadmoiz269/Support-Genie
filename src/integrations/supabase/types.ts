@@ -9,6 +9,39 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      support_tickets: {
+        Row: {
+          category: string
+          created_at: string
+          customer_email: string | null
+          id: string
+          message: string
+          priority: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          customer_email?: string | null
+          id?: string
+          message: string
+          priority?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          customer_email?: string | null
+          id?: string
+          message?: string
+          priority?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           created_at: string
@@ -44,7 +77,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_task_message: {
+        Args: { message_text: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
