@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WhatsAppSimulator from '@/components/WhatsAppSimulator';
 import SupportDashboard from '@/components/SupportDashboard';
 import KnowledgeBase from '@/components/KnowledgeBase';
-import { MessageSquare, Dashboard, BookOpen } from 'lucide-react';
+import { MessageSquare, BarChart3, BookOpen } from 'lucide-react';
 
 const Index = () => {
   return (
@@ -27,7 +27,7 @@ const Index = () => {
               WhatsApp Simulator
             </TabsTrigger>
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <Dashboard className="h-4 w-4" />
+              <BarChart3 className="h-4 w-4" />
               Support Dashboard
             </TabsTrigger>
             <TabsTrigger value="knowledge" className="flex items-center gap-2">

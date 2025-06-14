@@ -47,15 +47,15 @@ export const getKnowledgeBaseSuggestion = (message: string): string | null => {
   return null;
 };
 
-// Sample tickets for the dashboard
+// Sample tickets for the dashboard with proper typing
 export const generateSampleTickets = () => {
   return [
     {
       id: 'TK-001',
       message: 'My API calls are returning 500 errors consistently',
       category: 'API Issue',
-      status: 'open',
-      priority: 'high',
+      status: 'open' as const,
+      priority: 'high' as const,
       createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
       customer: 'john.doe@example.com',
     },
@@ -63,8 +63,8 @@ export const generateSampleTickets = () => {
       id: 'TK-002',
       message: 'Payment has been pending for over an hour',
       category: 'Transaction Delay',
-      status: 'pending',
-      priority: 'medium',
+      status: 'pending' as const,
+      priority: 'medium' as const,
       createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
       customer: 'jane.smith@example.com',
     },
@@ -72,8 +72,8 @@ export const generateSampleTickets = () => {
       id: 'TK-003',
       message: 'Need help understanding the webhook configuration',
       category: 'General',
-      status: 'closed',
-      priority: 'low',
+      status: 'closed' as const,
+      priority: 'low' as const,
       createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
       customer: 'support@company.com',
     },
@@ -81,8 +81,8 @@ export const generateSampleTickets = () => {
       id: 'TK-004',
       message: 'Cannot find the integration settings page',
       category: 'Product Flow',
-      status: 'open',
-      priority: 'medium',
+      status: 'open' as const,
+      priority: 'medium' as const,
       createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
       customer: 'admin@startup.io',
     },
