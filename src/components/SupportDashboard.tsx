@@ -130,9 +130,15 @@ const SupportDashboard = () => {
     const colors = {
       'API Issue': 'bg-red-100 text-red-800',
       'Transaction Delay': 'bg-orange-100 text-orange-800',
-      'Product Flow': 'bg-blue-100 text-blue-800',
       'Onboarding': 'bg-green-100 text-green-800',
-      'Task Request': 'bg-purple-100 text-purple-800',
+      'Product Flow': 'bg-blue-100 text-blue-800',
+      'Inventory': 'bg-purple-100 text-purple-800',
+      'Customer Management': 'bg-teal-100 text-teal-800',
+      'Daily Operations': 'bg-indigo-100 text-indigo-800',
+      'Hardware Support': 'bg-yellow-100 text-yellow-800',
+      'Multi-Location': 'bg-pink-100 text-pink-800',
+      'Gift Cards': 'bg-cyan-100 text-cyan-800',
+      'Task Request': 'bg-gray-100 text-gray-800',
       'General': 'bg-gray-100 text-gray-800',
     };
     return colors[category as keyof typeof colors] || colors.General;
@@ -266,8 +272,14 @@ const SupportDashboard = () => {
                 <SelectItem value="all">All Categories</SelectItem>
                 <SelectItem value="API Issue">API Issue</SelectItem>
                 <SelectItem value="Transaction Delay">Transaction Delay</SelectItem>
-                <SelectItem value="Product Flow">Product Flow</SelectItem>
                 <SelectItem value="Onboarding">Onboarding</SelectItem>
+                <SelectItem value="Product Flow">Product Flow</SelectItem>
+                <SelectItem value="Inventory">Inventory</SelectItem>
+                <SelectItem value="Customer Management">Customer Management</SelectItem>
+                <SelectItem value="Daily Operations">Daily Operations</SelectItem>
+                <SelectItem value="Hardware Support">Hardware Support</SelectItem>
+                <SelectItem value="Multi-Location">Multi-Location</SelectItem>
+                <SelectItem value="Gift Cards">Gift Cards</SelectItem>
                 <SelectItem value="Task Request">Task Request</SelectItem>
                 <SelectItem value="General">General</SelectItem>
               </SelectContent>
