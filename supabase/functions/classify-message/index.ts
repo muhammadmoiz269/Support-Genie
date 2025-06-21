@@ -30,13 +30,16 @@ serve(async (req) => {
       throw new Error(`Knowledge base fetch error: ${kbError.message}`)
     }
 
-    // Prepare categories and keywords for OpenAI
+    // Prepare categories and detailed knowledge for OpenAI
     const categories = [...new Set(knowledgeBase.map(item => item.category))]
-    const categoryDescriptions = knowledgeBase.map(item => 
-      `${item.category}: Keywords include ${item.keywords.join(', ')}`
-    ).join('\n')
+    const knowledgeBaseContent = knowledgeBase.map(item => 
+      `Category: ${item.category}
+Title: ${item.title}
+Content: ${item.content}
+Keywords: ${item.keywords.join(', ')}`
+    ).join('\n\n---\n\n')
 
-    // OpenAI API call
+    // OpenAI API call with enhanced prompt for better understanding
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -48,28 +51,36 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a support ticket classifier for a retail POS system. Based on the user message, classify it into one of these categories and provide a helpful response.
+            content: `You are an expert support assistant for a retail POS system. Your goal is to understand the user's query and provide the most helpful solution from the knowledge base.
 
-Available categories:
-${categoryDescriptions}
+KNOWLEDGE BASE:
+${knowledgeBaseContent}
+
+Available categories: ${categories.join(', ')}
+
+INSTRUCTIONS:
+1. Analyze the user's message to understand their specific problem
+2. Find the most relevant knowledge base article(s) that can solve their issue
+3. Provide a clear, step-by-step solution using information from the knowledge base
+4. If multiple articles are relevant, combine the information intelligently
+5. Always end with asking if the issue is resolved: "Is this issue resolved? Please reply with 'yes' or 'no'."
 
 Your response should be a JSON object with:
-- "category": the most appropriate category from the list
-- "confidence": a number from 0-1 indicating confidence in classification
-- "response": a helpful response to the user's query based on the knowledge base
-- "priority": "high", "medium", or "low" based on urgency
+- "category": the most appropriate category from the available categories
+- "confidence": a number from 0-1 indicating confidence in classification  
+- "response": a detailed, helpful response that directly addresses their query using knowledge base content, always ending with the resolution question
+- "priority": "high" for urgent issues (API, transactions, hardware), "medium" for operational issues, "low" for general questions
+- "requiresTicket": false (since we'll create tickets conditionally based on user response)
 
-Prioritize as "high" for: API issues, transaction delays, hardware problems
-Prioritize as "medium" for: product flow, inventory, customer management
-Prioritize as "low" for: onboarding, general questions`
+Focus on providing actionable solutions rather than generic responses.`
           },
           {
             role: 'user',
-            content: `Classify this message: "${message}"`
+            content: `User query: "${message}"`
           }
         ],
         temperature: 0.3,
-        max_tokens: 500
+        max_tokens: 800
       })
     })
 
@@ -88,18 +99,10 @@ Prioritize as "low" for: onboarding, general questions`
       classification = {
         category: 'General',
         confidence: 0.5,
-        response: 'Thank you for your message. I\'ve created a support ticket and our team will review it.',
-        priority: 'medium'
+        response: 'Thank you for your message. Let me help you with that. Is this issue resolved? Please reply with "yes" or "no".',
+        priority: 'medium',
+        requiresTicket: false
       }
-    }
-
-    // Find matching knowledge base article for more detailed response
-    const matchingArticle = knowledgeBase.find(item => 
-      item.category === classification.category
-    )
-
-    if (matchingArticle && classification.confidence > 0.7) {
-      classification.response = matchingArticle.content
     }
 
     return new Response(
@@ -115,8 +118,9 @@ Prioritize as "low" for: onboarding, general questions`
       JSON.stringify({ 
         error: error.message,
         category: 'General',
-        response: 'I apologize, but I\'m having trouble processing your request right now. A support ticket has been created and our team will review it.',
-        priority: 'medium'
+        response: 'I apologize, but I\'m having trouble processing your request right now. Is this issue resolved? Please reply with "yes" or "no".',
+        priority: 'medium',
+        requiresTicket: false
       }),
       { 
         status: 500,

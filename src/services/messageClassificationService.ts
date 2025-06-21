@@ -6,6 +6,7 @@ export interface ClassificationResult {
   confidence: number;
   response: string;
   priority: 'high' | 'medium' | 'low';
+  requiresTicket?: boolean;
 }
 
 export const messageClassificationService = {
@@ -37,8 +38,9 @@ export const messageClassificationService = {
       return {
         category: 'API Issue',
         confidence: 0.6,
-        response: 'I see you\'re having API-related issues. Please check your API credentials and try again.',
-        priority: 'high'
+        response: 'I see you\'re having API-related issues. Please check your API credentials and network connection. Try restarting your application and ensure your API endpoints are correct. Is this issue resolved? Please reply with "yes" or "no".',
+        priority: 'high',
+        requiresTicket: false
       };
     }
     
@@ -46,8 +48,9 @@ export const messageClassificationService = {
       return {
         category: 'Transaction Delay',
         confidence: 0.6,
-        response: 'I understand you\'re experiencing payment processing issues. Please check your connection and try again.',
-        priority: 'high'
+        response: 'I understand you\'re experiencing payment processing issues. Please check your internet connection, verify payment gateway settings, and try processing a test transaction. If the issue persists, restart the payment terminal. Is this issue resolved? Please reply with "yes" or "no".',
+        priority: 'high',
+        requiresTicket: false
       };
     }
     
@@ -55,8 +58,9 @@ export const messageClassificationService = {
       return {
         category: 'Onboarding',
         confidence: 0.6,
-        response: 'I can help you with setup and onboarding. Please let me know what specific area you need assistance with.',
-        priority: 'low'
+        response: 'I can help you with setup and onboarding. Please check our setup guide in the documentation, ensure all prerequisites are met, and follow the step-by-step installation process. Is this issue resolved? Please reply with "yes" or "no".',
+        priority: 'low',
+        requiresTicket: false
       };
     }
     
@@ -64,8 +68,9 @@ export const messageClassificationService = {
       return {
         category: 'Product Flow',
         confidence: 0.6,
-        response: 'I can help you with the checkout process and product flow. What specific issue are you experiencing?',
-        priority: 'medium'
+        response: 'I can help you with the checkout process. Please verify that your barcode scanner is connected, check product codes in your inventory, and ensure discount settings are properly configured. Is this issue resolved? Please reply with "yes" or "no".',
+        priority: 'medium',
+        requiresTicket: false
       };
     }
     
@@ -73,8 +78,9 @@ export const messageClassificationService = {
       return {
         category: 'Inventory',
         confidence: 0.6,
-        response: 'I can assist with inventory management. Please describe your specific inventory question.',
-        priority: 'medium'
+        response: 'I can assist with inventory management. Please check your inventory synchronization settings, verify product data is up to date, and ensure your inventory tracking is enabled. Is this issue resolved? Please reply with "yes" or "no".',
+        priority: 'medium',
+        requiresTicket: false
       };
     }
     
@@ -82,16 +88,18 @@ export const messageClassificationService = {
       return {
         category: 'Hardware Support',
         confidence: 0.6,
-        response: 'I can help troubleshoot hardware issues. Please describe the specific hardware problem you\'re experiencing.',
-        priority: 'high'
+        response: 'I can help troubleshoot hardware issues. Please check all cable connections, restart the device, ensure drivers are updated, and verify power supply. Is this issue resolved? Please reply with "yes" or "no".',
+        priority: 'high',
+        requiresTicket: false
       };
     }
     
     return {
       category: 'General',
       confidence: 0.4,
-      response: 'Thank you for your message. I\'ve created a support ticket and our team will review it.',
-      priority: 'medium'
+      response: 'Thank you for your message. I\'ve reviewed your query and I\'m here to help. Could you provide more specific details about the issue you\'re experiencing? Is this issue resolved? Please reply with "yes" or "no".',
+      priority: 'medium',
+      requiresTicket: false
     };
   }
 };

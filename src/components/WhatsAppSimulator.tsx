@@ -6,8 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Send, Bot, User, MessageSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { messageClassificationService, type ClassificationResult } from "@/services/messageClassificationService";
+import ConversationHandler from './ConversationHandler';
 
 interface Message {
   id: string;
@@ -16,6 +16,8 @@ interface Message {
   timestamp: Date;
   category?: string;
   confidence?: number;
+  classification?: ClassificationResult;
+  showConversationHandler?: boolean;
 }
 
 const WhatsAppSimulator = () => {
@@ -23,36 +25,6 @@ const WhatsAppSimulator = () => {
   const [currentMessage, setCurrentMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-
-  const createSupportTicket = async (message: string, classification: ClassificationResult) => {
-    try {
-      const { data: ticketData, error: ticketError } = await supabase
-        .from('support_tickets')
-        .insert({
-          message,
-          category: classification.category,
-          status: 'open',
-          priority: classification.priority
-        })
-        .select()
-        .single();
-
-      if (ticketError) {
-        console.error('Error creating support ticket:', ticketError);
-        return null;
-      }
-
-      return ticketData;
-    } catch (error) {
-      console.error('Error creating support ticket:', error);
-      toast({
-        title: "Error creating ticket",
-        description: "There was an error creating the support ticket. Please try again.",
-        variant: "destructive",
-      });
-      return null;
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!currentMessage.trim() || isProcessing) return;
@@ -67,28 +39,20 @@ const WhatsAppSimulator = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageToProcess = currentMessage;
     setCurrentMessage('');
 
     try {
       // Use OpenAI-powered classification
-      const classification = await messageClassificationService.classifyMessage(currentMessage);
+      const classification = await messageClassificationService.classifyMessage(messageToProcess);
       
       userMessage.category = classification.category;
       userMessage.confidence = classification.confidence;
+      userMessage.classification = classification;
       
       setMessages(prev => prev.map(msg => 
         msg.id === userMessage.id ? userMessage : msg
       ));
-
-      // Create support ticket
-      const ticketData = await createSupportTicket(currentMessage, classification);
-      
-      if (ticketData) {
-        toast({
-          title: "Support ticket created!",
-          description: `Ticket ${ticketData.id.slice(0, 8)} created with category: ${classification.category} (${Math.round(classification.confidence * 100)}% confidence)`,
-        });
-      }
 
       // Auto-respond with AI-generated response
       setTimeout(() => {
@@ -97,6 +61,8 @@ const WhatsAppSimulator = () => {
           text: classification.response,
           sender: 'bot',
           timestamp: new Date(),
+          classification,
+          showConversationHandler: true
         };
         setMessages(prev => [...prev, botMessage]);
       }, 1000);
@@ -111,6 +77,12 @@ const WhatsAppSimulator = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleConversationComplete = (messageId: string) => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId ? { ...msg, showConversationHandler: false } : msg
+    ));
   };
 
   const getCategoryColor = (category: string) => {
@@ -142,41 +114,50 @@ const WhatsAppSimulator = () => {
         <CardContent className="flex-1 flex flex-col p-0">
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={message.id} className="space-y-2">
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.sender === 'user'
-                      ? 'bg-green-500 text-white rounded-br-sm'
-                      : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
-                  }`}
+                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    {message.sender === 'user' ? (
-                      <User className="h-3 w-3" />
-                    ) : (
-                      <Bot className="h-3 w-3" />
-                    )}
-                    <span className="text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="text-sm">{message.text}</p>
-                  {message.category && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <Badge className={`text-xs ${getCategoryColor(message.category)}`}>
-                        {message.category}
-                      </Badge>
-                      {message.confidence && (
-                        <span className="text-xs opacity-60">
-                          {Math.round(message.confidence * 100)}% confidence
-                        </span>
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                      message.sender === 'user'
+                        ? 'bg-green-500 text-white rounded-br-sm'
+                        : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      {message.sender === 'user' ? (
+                        <User className="h-3 w-3" />
+                      ) : (
+                        <Bot className="h-3 w-3" />
                       )}
+                      <span className="text-xs opacity-70">
+                        {message.timestamp.toLocaleTimeString()}
+                      </span>
                     </div>
-                  )}
+                    <p className="text-sm">{message.text}</p>
+                    {message.category && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge className={`text-xs ${getCategoryColor(message.category)}`}>
+                          {message.category}
+                        </Badge>
+                        {message.confidence && (
+                          <span className="text-xs opacity-60">
+                            {Math.round(message.confidence * 100)}% confidence
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                
+                {message.showConversationHandler && message.classification && (
+                  <ConversationHandler
+                    originalMessage={messages.find(m => m.sender === 'user' && m.timestamp < message.timestamp)?.text || ''}
+                    classification={message.classification}
+                    onConversationComplete={() => handleConversationComplete(message.id)}
+                  />
+                )}
               </div>
             ))}
             {isProcessing && (
@@ -219,42 +200,35 @@ const WhatsAppSimulator = () => {
 
       <Card className="h-[600px]">
         <CardHeader>
-          <CardTitle>AI-Powered Classification</CardTitle>
+          <CardTitle>Enhanced AI Support System</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-gray-600">
             <p className="mb-4">
-              Every message is now analyzed by AI using OpenAI API and knowledge base from Supabase! Try these sample messages:
+              The AI now provides intelligent solutions and only creates tickets when needed! Try these sample messages:
             </p>
             <div className="space-y-2">
               <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                <p className="font-medium text-red-800">API Issue (High Priority):</p>
+                <p className="font-medium text-red-800">API Issue:</p>
                 <p className="text-sm">"My API calls are returning 500 errors and I can't process any transactions"</p>
               </div>
               <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-                <p className="font-medium text-orange-800">Transaction Delay (High Priority):</p>
-                <p className="text-sm">"Customer payment has been pending for 30 minutes and they're getting frustrated"</p>
-              </div>
-              <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <p className="font-medium text-yellow-800">Hardware Support (High Priority):</p>
-                <p className="text-sm">"Our receipt printer stopped working during peak hours"</p>
+                <p className="font-medium text-orange-800">Transaction Delay:</p>
+                <p className="text-sm">"Customer payment has been pending for 30 minutes"</p>
               </div>
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="font-medium text-blue-800">Product Flow (Medium Priority):</p>
-                <p className="text-sm">"I can't find how to apply a discount to a customer's order"</p>
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                <p className="font-medium text-green-800">Onboarding (Low Priority):</p>
-                <p className="text-sm">"How do I set up user accounts for my new employees?"</p>
+                <p className="font-medium text-blue-800">Product Flow:</p>
+                <p className="text-sm">"How do I apply a discount to a customer's order?"</p>
               </div>
             </div>
             <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm font-medium text-blue-800">✨ New Features:</p>
               <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                <li>• AI-powered message classification with confidence scores</li>
-                <li>• Dynamic knowledge base from Supabase</li>
-                <li>• Intelligent priority assignment</li>
-                <li>• Context-aware responses</li>
+                <li>• AI extracts relevant solutions from knowledge base</li>
+                <li>• Provides step-by-step solutions</li>
+                <li>• Asks for resolution confirmation</li>
+                <li>• Only creates tickets when issues aren't resolved</li>
+                <li>• Smart priority and category assignment</li>
               </ul>
             </div>
           </div>
