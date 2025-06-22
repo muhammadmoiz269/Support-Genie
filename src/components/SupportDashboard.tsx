@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Clock, AlertCircle, CheckCircle, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { knowledgeBaseService } from "@/services/knowledgeBaseService";
 import type { Tables } from "@/integrations/supabase/types";
 
 // Use the Supabase generated types
@@ -17,11 +17,13 @@ const SupportDashboard = () => {
   const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchTickets();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -63,6 +65,20 @@ const SupportDashboard = () => {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const knowledgeBaseCategories = await knowledgeBaseService.getCategories();
+      setCategories(knowledgeBaseCategories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      toast({
+        title: "Error fetching categories",
+        description: "Could not load category filters",
+        variant: "destructive",
+      });
+    }
+  };
+
   const updateTicketStatus = async (ticketId: string, newStatus: string) => {
     try {
       const { error } = await supabase
@@ -98,6 +114,7 @@ const SupportDashboard = () => {
   const refreshData = () => {
     setLoading(true);
     fetchTickets();
+    fetchCategories();
   };
 
   const getStatusIcon = (status: string) => {
@@ -270,18 +287,11 @@ const SupportDashboard = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="API Issue">API Issue</SelectItem>
-                <SelectItem value="Transaction Delay">Transaction Delay</SelectItem>
-                <SelectItem value="Onboarding">Onboarding</SelectItem>
-                <SelectItem value="Product Flow">Product Flow</SelectItem>
-                <SelectItem value="Inventory">Inventory</SelectItem>
-                <SelectItem value="Customer Management">Customer Management</SelectItem>
-                <SelectItem value="Daily Operations">Daily Operations</SelectItem>
-                <SelectItem value="Hardware Support">Hardware Support</SelectItem>
-                <SelectItem value="Multi-Location">Multi-Location</SelectItem>
-                <SelectItem value="Gift Cards">Gift Cards</SelectItem>
-                <SelectItem value="Task Request">Task Request</SelectItem>
-                <SelectItem value="General">General</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
