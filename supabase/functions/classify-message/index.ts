@@ -33,7 +33,7 @@ serve(async (req) => {
 
     console.log(`Fetched ${knowledgeBase?.length || 0} knowledge base articles`)
 
-    // Prepare categories and detailed knowledge for OpenAI
+    // Prepare categories and detailed knowledge for Gemini
     const categories = [...new Set(knowledgeBase.map(item => item.category))]
     const knowledgeBaseContent = knowledgeBase.map(item => 
       `Category: ${item.category}
@@ -46,19 +46,16 @@ Keywords: ${item.keywords.join(', ')}
     console.log('Available categories:', categories)
     console.log('User message:', message)
 
-    // Enhanced OpenAI API call with better keyword matching instructions
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Gemini API call with enhanced prompt for better keyword matching
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${Deno.env.get('GOOGLE_API_KEY')}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert support assistant for a retail POS system. Your goal is to understand the user's query and provide the most helpful solution from the knowledge base.
+        contents: [{
+          parts: [{
+            text: `You are an expert support assistant for a retail POS system. Your goal is to understand the user's query and provide the most helpful solution from the knowledge base.
 
 KNOWLEDGE BASE:
 ${knowledgeBaseContent}
@@ -86,32 +83,37 @@ Your response should be a JSON object with:
 - "priority": "high" for urgent issues (API, transactions, hardware), "medium" for operational issues, "low" for general questions
 - "requiresTicket": false (since we'll create tickets conditionally based on user response)
 
-Focus on providing actionable solutions rather than generic responses. Remember: keywords in the knowledge base are specifically designed to catch relevant queries.`
-          },
-          {
-            role: 'user',
-            content: `User query: "${message}"`
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 1000
+Focus on providing actionable solutions rather than generic responses. Remember: keywords in the knowledge base are specifically designed to catch relevant queries.
+
+User query: "${message}"
+
+Please respond with ONLY the JSON object, no additional text.`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1000,
+        }
       })
     })
 
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text()
-      console.error('OpenAI API error:', openAIResponse.status, errorText)
-      throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorText}`)
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text()
+      console.error('Gemini API error:', geminiResponse.status, errorText)
+      throw new Error(`Gemini API error: ${geminiResponse.status} ${errorText}`)
     }
 
-    const openAIData = await openAIResponse.json()
-    const aiResponse = openAIData.choices[0].message.content
+    const geminiData = await geminiResponse.json()
+    const aiResponse = geminiData.candidates[0].content.parts[0].text
 
-    console.log('OpenAI response:', aiResponse)
+    console.log('Gemini response:', aiResponse)
 
     let classification
     try {
-      classification = JSON.parse(aiResponse)
+      // Clean the response to extract JSON if there's extra text
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
+      const jsonString = jsonMatch ? jsonMatch[0] : aiResponse
+      classification = JSON.parse(jsonString)
       console.log('Parsed classification:', classification)
     } catch (e) {
       console.error('JSON parsing error:', e)
