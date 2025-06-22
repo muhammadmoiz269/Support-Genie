@@ -25,10 +25,13 @@ serve(async (req) => {
     const { data: knowledgeBase, error: kbError } = await supabaseClient
       .from('knowledge_base')
       .select('*')
+      .order('created_at', { ascending: false })
 
     if (kbError) {
       throw new Error(`Knowledge base fetch error: ${kbError.message}`)
     }
+
+    console.log(`Fetched ${knowledgeBase?.length || 0} knowledge base articles`)
 
     // Prepare categories and detailed knowledge for OpenAI
     const categories = [...new Set(knowledgeBase.map(item => item.category))]
@@ -36,10 +39,14 @@ serve(async (req) => {
       `Category: ${item.category}
 Title: ${item.title}
 Content: ${item.content}
-Keywords: ${item.keywords.join(', ')}`
-    ).join('\n\n---\n\n')
+Keywords: ${item.keywords.join(', ')}
+---`
+    ).join('\n\n')
 
-    // OpenAI API call with enhanced prompt for better understanding
+    console.log('Available categories:', categories)
+    console.log('User message:', message)
+
+    // Enhanced OpenAI API call with better keyword matching instructions
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -58,43 +65,56 @@ ${knowledgeBaseContent}
 
 Available categories: ${categories.join(', ')}
 
-INSTRUCTIONS:
-1. Analyze the user's message to understand their specific problem
-2. Find the most relevant knowledge base article(s) that can solve their issue
-3. Provide a clear, step-by-step solution using information from the knowledge base
-4. If multiple articles are relevant, combine the information intelligently
-5. Always end with asking if the issue is resolved: "Is this issue resolved? Please reply with 'yes' or 'no'."
+CLASSIFICATION INSTRUCTIONS:
+1. Carefully analyze the user's message against ALL knowledge base articles
+2. Pay special attention to the KEYWORDS field in each article - these are critical for accurate classification
+3. If the user's message contains any keywords that match a knowledge base article, that category should be strongly considered
+4. Look for exact keyword matches, partial matches, and semantic similarity
+5. The keywords field is specifically designed to catch queries that should be classified under that category
+6. Do NOT default to "General" if there are relevant keyword matches in the knowledge base
+
+RESPONSE INSTRUCTIONS:
+1. Find the most relevant knowledge base article(s) that can solve their issue
+2. Provide a clear, step-by-step solution using information from the knowledge base
+3. If multiple articles are relevant, combine the information intelligently
+4. Always end with asking if the issue is resolved: "Is this issue resolved? Please reply with 'yes' or 'no'."
 
 Your response should be a JSON object with:
-- "category": the most appropriate category from the available categories
-- "confidence": a number from 0-1 indicating confidence in classification  
+- "category": the most appropriate category from the available categories (avoid "General" unless no other category fits)
+- "confidence": a number from 0-1 indicating confidence in classification (higher confidence for keyword matches)
 - "response": a detailed, helpful response that directly addresses their query using knowledge base content, always ending with the resolution question
 - "priority": "high" for urgent issues (API, transactions, hardware), "medium" for operational issues, "low" for general questions
 - "requiresTicket": false (since we'll create tickets conditionally based on user response)
 
-Focus on providing actionable solutions rather than generic responses.`
+Focus on providing actionable solutions rather than generic responses. Remember: keywords in the knowledge base are specifically designed to catch relevant queries.`
           },
           {
             role: 'user',
             content: `User query: "${message}"`
           }
         ],
-        temperature: 0.3,
-        max_tokens: 800
+        temperature: 0.2,
+        max_tokens: 1000
       })
     })
 
     if (!openAIResponse.ok) {
-      throw new Error(`OpenAI API error: ${openAIResponse.statusText}`)
+      const errorText = await openAIResponse.text()
+      console.error('OpenAI API error:', openAIResponse.status, errorText)
+      throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorText}`)
     }
 
     const openAIData = await openAIResponse.json()
     const aiResponse = openAIData.choices[0].message.content
 
+    console.log('OpenAI response:', aiResponse)
+
     let classification
     try {
       classification = JSON.parse(aiResponse)
+      console.log('Parsed classification:', classification)
     } catch (e) {
+      console.error('JSON parsing error:', e)
       // Fallback if JSON parsing fails
       classification = {
         category: 'General',
