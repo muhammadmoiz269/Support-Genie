@@ -18,6 +18,7 @@ interface Message {
   confidence?: number;
   classification?: ClassificationResult;
   showConversationHandler?: boolean;
+  correspondingUserMessageId?: string; // Link to the user message this bot response is for
 }
 
 const WhatsAppSimulator = () => {
@@ -43,7 +44,7 @@ const WhatsAppSimulator = () => {
     setCurrentMessage('');
 
     try {
-      // Use OpenAI-powered classification
+      // Use Gemini-powered classification
       const classification = await messageClassificationService.classifyMessage(messageToProcess);
       
       userMessage.category = classification.category;
@@ -62,7 +63,8 @@ const WhatsAppSimulator = () => {
           sender: 'bot',
           timestamp: new Date(),
           classification,
-          showConversationHandler: true
+          showConversationHandler: true,
+          correspondingUserMessageId: userMessage.id // Link this bot response to the specific user message
         };
         setMessages(prev => [...prev, botMessage]);
       }, 1000);
@@ -97,9 +99,15 @@ const WhatsAppSimulator = () => {
       'Hardware Support': 'bg-yellow-100 text-yellow-800',
       'Multi-Location': 'bg-pink-100 text-pink-800',
       'Gift Cards': 'bg-cyan-100 text-cyan-800',
+      'Product Search & Filter': 'bg-lime-100 text-lime-800',
       'General': 'bg-gray-100 text-gray-800',
     };
     return colors[category as keyof typeof colors] || colors.General;
+  };
+
+  // Helper function to find the corresponding user message for a bot message
+  const findCorrespondingUserMessage = (botMessage: Message): Message | undefined => {
+    return messages.find(msg => msg.id === botMessage.correspondingUserMessageId);
   };
 
   return (
@@ -153,7 +161,7 @@ const WhatsAppSimulator = () => {
                 
                 {message.showConversationHandler && message.classification && (
                   <ConversationHandler
-                    originalMessage={messages.find(m => m.sender === 'user' && m.timestamp < message.timestamp)?.text || ''}
+                    originalMessage={findCorrespondingUserMessage(message)?.text || ''}
                     classification={message.classification}
                     onConversationComplete={() => handleConversationComplete(message.id)}
                   />
@@ -220,6 +228,10 @@ const WhatsAppSimulator = () => {
                 <p className="font-medium text-blue-800">Product Flow:</p>
                 <p className="text-sm">"How do I apply a discount to a customer's order?"</p>
               </div>
+              <div className="p-3 bg-lime-50 rounded-lg border border-lime-200">
+                <p className="font-medium text-lime-800">Search & Filter:</p>
+                <p className="text-sm">"Search not working"</p>
+              </div>
             </div>
             <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm font-medium text-blue-800">✨ New Features:</p>
@@ -229,6 +241,7 @@ const WhatsAppSimulator = () => {
                 <li>• Asks for resolution confirmation</li>
                 <li>• Only creates tickets when issues aren't resolved</li>
                 <li>• Smart priority and category assignment</li>
+                <li>• Correct message-to-ticket mapping</li>
               </ul>
             </div>
           </div>

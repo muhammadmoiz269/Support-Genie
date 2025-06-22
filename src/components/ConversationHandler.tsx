@@ -20,13 +20,13 @@ const ConversationHandler = ({ originalMessage, classification, onConversationCo
     setIsProcessing(true);
 
     if (!isResolved) {
-      // Create support ticket if issue is not resolved
+      // Create support ticket using the specific message and classification for this conversation
       try {
         const { data: ticketData, error: ticketError } = await supabase
           .from('support_tickets')
           .insert({
-            message: originalMessage,
-            category: classification.category,
+            message: originalMessage, // This is now the correct message for this specific classification
+            category: classification.category, // This is the correct category for this specific classification
             status: 'open',
             priority: classification.priority
           })
@@ -43,7 +43,7 @@ const ConversationHandler = ({ originalMessage, classification, onConversationCo
         } else {
           toast({
             title: "Support ticket created!",
-            description: `Ticket ${ticketData.id.slice(0, 8)} has been created. Our support team will assist you further.`,
+            description: `Ticket ${ticketData.id.slice(0, 8)} has been created for "${classification.category}" category. Our support team will assist you further.`,
           });
         }
       } catch (error) {
