@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +40,42 @@ const ConversationHandler = ({ originalMessage, classification, onConversationCo
             variant: "destructive",
           });
         } else {
+          // Send email notifications to assigned users
+          try {
+            // Get users assigned to this category
+            const { data: assignments, error: assignmentError } = await supabase
+              .from('user_category_assignments')
+              .select(`
+                category_users (
+                  name,
+                  email
+                )
+              `)
+              .eq('category', classification.category);
+
+            if (!assignmentError && assignments.length > 0) {
+              const userEmails = assignments
+                .map(assignment => assignment.category_users?.email)
+                .filter(email => email);
+
+              if (userEmails.length > 0) {
+                // Call the email notification function
+                const { error: notificationError } = await supabase.functions.invoke('send-ticket-notification', {
+                  body: {
+                    ticketData,
+                    userEmails
+                  }
+                });
+
+                if (notificationError) {
+                  console.error('Error sending notifications:', notificationError);
+                }
+              }
+            }
+          } catch (notificationError) {
+            console.error('Error handling notifications:', notificationError);
+          }
+
           toast({
             title: "Support ticket created!",
             description: `Ticket ${ticketData.id.slice(0, 8)} has been created for "${classification.category}" category. Our support team will assist you further.`,
