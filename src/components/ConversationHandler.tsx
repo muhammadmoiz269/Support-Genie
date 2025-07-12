@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -19,13 +20,13 @@ const ConversationHandler = ({ originalMessage, classification, onConversationCo
     setIsProcessing(true);
 
     if (!isResolved) {
-      // Create support ticket using the specific message and classification for this conversation
+      // Create support ticket immediately for instant user feedback
       try {
         const { data: ticketData, error: ticketError } = await supabase
           .from('support_tickets')
           .insert({
-            message: originalMessage, // This is now the correct message for this specific classification
-            category: classification.category, // This is the correct category for this specific classification
+            message: originalMessage,
+            category: classification.category,
             status: 'open',
             priority: classification.priority
           })
@@ -39,48 +40,22 @@ const ConversationHandler = ({ originalMessage, classification, onConversationCo
             description: "There was an error creating the support ticket. Please try again.",
             variant: "destructive",
           });
-        } else {
-          // Send email notifications to assigned users
-          try {
-            // Get users assigned to this category
-            const { data: assignments, error: assignmentError } = await supabase
-              .from('user_category_assignments')
-              .select(`
-                category_users (
-                  name,
-                  email
-                )
-              `)
-              .eq('category', classification.category);
-
-            if (!assignmentError && assignments.length > 0) {
-              const userEmails = assignments
-                .map(assignment => assignment.category_users?.email)
-                .filter(email => email);
-
-              if (userEmails.length > 0) {
-                // Call the email notification function
-                const { error: notificationError } = await supabase.functions.invoke('send-ticket-notification', {
-                  body: {
-                    ticketData,
-                    userEmails
-                  }
-                });
-
-                if (notificationError) {
-                  console.error('Error sending notifications:', notificationError);
-                }
-              }
-            }
-          } catch (notificationError) {
-            console.error('Error handling notifications:', notificationError);
-          }
-
-          toast({
-            title: "Support ticket created!",
-            description: `Ticket ${ticketData.id.slice(0, 8)} has been created for "${classification.category}" category. Our support team will assist you further.`,
-          });
+          setIsProcessing(false);
+          return;
         }
+
+        // Show immediate success feedback
+        toast({
+          title: "Support ticket created!",
+          description: `Ticket ${ticketData.id.slice(0, 8)} has been created for "${classification.category}" category. Our support team will assist you further.`,
+        });
+
+        // Handle email notifications in the background (non-blocking)
+        handleEmailNotifications(ticketData).catch(error => {
+          console.error('Background email notification error:', error);
+          // Don't show error to user since ticket was created successfully
+        });
+
       } catch (error) {
         console.error('Error creating support ticket:', error);
         toast({
@@ -88,6 +63,8 @@ const ConversationHandler = ({ originalMessage, classification, onConversationCo
           description: "There was an error creating the support ticket. Please try again.",
           variant: "destructive",
         });
+        setIsProcessing(false);
+        return;
       }
     } else {
       toast({
@@ -99,6 +76,46 @@ const ConversationHandler = ({ originalMessage, classification, onConversationCo
     setIsWaitingForResponse(false);
     setIsProcessing(false);
     onConversationComplete();
+  };
+
+  // Background function to handle email notifications
+  const handleEmailNotifications = async (ticketData: any) => {
+    try {
+      // Get users assigned to this category
+      const { data: assignments, error: assignmentError } = await supabase
+        .from('user_category_assignments')
+        .select(`
+          category_users (
+            name,
+            email
+          )
+        `)
+        .eq('category', classification.category);
+
+      if (!assignmentError && assignments.length > 0) {
+        const userEmails = assignments
+          .map(assignment => assignment.category_users?.email)
+          .filter(email => email);
+
+        if (userEmails.length > 0) {
+          // Call the email notification function in the background
+          const { error: notificationError } = await supabase.functions.invoke('send-ticket-notification', {
+            body: {
+              ticketData,
+              userEmails
+            }
+          });
+
+          if (notificationError) {
+            console.error('Error sending background notifications:', notificationError);
+          } else {
+            console.log('Email notifications sent successfully in background');
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error handling background notifications:', notificationError);
+    }
   };
 
   if (!isWaitingForResponse) {
