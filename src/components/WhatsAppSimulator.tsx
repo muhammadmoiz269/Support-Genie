@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,7 @@ import { Send, Bot, User, MessageSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { messageClassificationService, type ClassificationResult } from "@/services/messageClassificationService";
 import ConversationHandler from './ConversationHandler';
-
+import axios from 'axios'
 interface Message {
   id: string;
   text: string;
@@ -27,10 +27,63 @@ const WhatsAppSimulator = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
+  const ACCOUNT_SID = 'AC693f156e099cf22a58f1ba99695449a1';
+        const AUTH_TOKEN = 'e0682014a48996dd537cdcd4acbde891';
+        const FROM_NUMBER = 'whatsapp:+14155238886'; // Twilio sandbox
+        const TO_NUMBER = `whatsapp:${+923102475070}`;
+
+  useEffect(() => {
+   const fetchMessages = async () => {
+    try {
+      const res = await axios.get('https://cbff3bec5748.ngrok-free.app/messages');
+      const msgArray = res.data?.messages || [];
+      const newest = msgArray[0];
+
+      const lastMsg = messages[0];
+      console.log("🚀 ~ fetchMessages ~ lastMsg:", lastMsg)
+
+      const isDuplicate = lastMsg && new Date(lastMsg.timestamp).getTime() === new Date(newest.timestamp).getTime();
+
+      console.log("🚀 ~ fetchMessages ~ msgArray:", msgArray, isDuplicate)
+
+      if (!isDuplicate) {
+        const formatted = {
+          id: `${newest?.timestamp}-${Math.random()}`,
+          text: newest?.body || `Hello ${messages.length}`,
+          sender: newest?.from?.includes('whatsapp:+19477292251') ? ('bot' as const) : ('user' as const),
+          timestamp: new Date(newest?.timestamp),
+        };
+        
+        setMessages(prev => [...prev, formatted]);
+      }
+      // const formattedMessages = data.map((msg: any) => ({
+      //   id: `${msg.timestamp}-${Math.random()}`,
+      //   text: msg.body,
+      //   sender: msg.from.includes('whatsapp:+14155238886') ? 'bot' : 'user',
+      //   timestamp: new Date(msg.timestamp),
+      // }));
+
+      // setMessages(formattedMessages);
+    } catch (error) {
+      console.error('❌ Axios error while fetching messages:', error);
+    }
+  };
+
+  fetchMessages(); // initial fetch
+  const interval = setInterval(fetchMessages, 5000); // polling
+  return () => clearInterval(interval); // cleanup
+  }, []);
+
   const handleSendMessage = async () => {
+    
+
     if (!currentMessage.trim() || isProcessing) return;
 
     setIsProcessing(true);
+
+    
+   
+    let messageToProcess, errorData;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -38,12 +91,24 @@ const WhatsAppSimulator = () => {
       sender: 'user',
       timestamp: new Date(),
     };
-
-    setMessages(prev => [...prev, userMessage]);
-    const messageToProcess = currentMessage;
-    setCurrentMessage('');
-
     try {
+
+     
+    // userMessage.text = jsonRes.body
+    // if (response.ok) {
+    //     console.log('✅ Message sent successfully!', response);
+
+     
+    
+        setMessages(prev => [...prev, userMessage]);
+        messageToProcess = currentMessage;
+        setCurrentMessage('');
+
+    // } else {
+    //     errorData = await response.json();
+    //     console.log(`❌ Failed: ${errorData.message}`);
+    // }
+
       // Use Gemini-powered classification
       const classification = await messageClassificationService.classifyMessage(messageToProcess);
       
@@ -56,7 +121,7 @@ const WhatsAppSimulator = () => {
       ));
 
       // Auto-respond with AI-generated response
-      setTimeout(() => {
+      setTimeout(async () => {
         const botMessage: Message = {
           id: (Date.now() + 1).toString(),
           text: classification.response,
@@ -66,6 +131,25 @@ const WhatsAppSimulator = () => {
           showConversationHandler: true,
           correspondingUserMessageId: userMessage.id // Link this bot response to the specific user message
         };
+        const url = `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID}/Messages.json`;
+
+    const body = new URLSearchParams({
+        From: FROM_NUMBER,
+        To: TO_NUMBER,
+        Body: botMessage.text
+    });
+
+    
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Basic ' + btoa(`${ACCOUNT_SID}:${AUTH_TOKEN}`),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body
+    });
+
+    let jsonRes = await response.json()
         setMessages(prev => [...prev, botMessage]);
       }, 1000);
 
