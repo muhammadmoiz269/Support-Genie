@@ -42,20 +42,20 @@ const WhatsAppSimulator = () => {
       const lastMsg = messages[0];
       console.log("🚀 ~ fetchMessages ~ lastMsg:", lastMsg)
 
-      const isDuplicate = lastMsg && new Date(lastMsg.timestamp).getTime() === new Date(newest.timestamp).getTime();
+      // const isDuplicate = lastMsg && new Date(lastMsg.timestamp).getTime() === new Date(newest.timestamp).getTime();
 
-      console.log("🚀 ~ fetchMessages ~ msgArray:", msgArray, isDuplicate)
+      // console.log("🚀 ~ fetchMessages ~ msgArray:", msgArray, isDuplicate)
 
-      if (!isDuplicate) {
-        const formatted = {
-          id: `${newest?.timestamp}-${Math.random()}`,
-          text: newest?.body || `Hello ${messages.length}`,
-          sender: newest?.from?.includes('whatsapp:+19477292251') ? ('bot' as const) : ('user' as const),
-          timestamp: new Date(newest?.timestamp),
-        };
+      // if (!isDuplicate) {
+      //   const formatted = {
+      //     id: `${newest?.timestamp}-${Math.random()}`,
+      //     text: newest?.body || `Hello ${messages.length}`,
+      //     sender: newest?.from?.includes('whatsapp:+19477292251') ? ('bot' as const) : ('user' as const),
+      //     timestamp: new Date(newest?.timestamp),
+      //   };
         
-        setMessages(prev => [...prev, formatted]);
-      }
+      //   setMessages(prev => [...prev, formatted]);
+      // }
       // const formattedMessages = data.map((msg: any) => ({
       //   id: `${msg.timestamp}-${Math.random()}`,
       //   text: msg.body,
